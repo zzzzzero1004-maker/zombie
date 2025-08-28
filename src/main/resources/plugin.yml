@@ -1,0 +1,10 @@
+name: ZombiePlugin
+main: com.yourname.zombie.ZombiePlugin
+version: 1.0
+api-version: 1.20
+author: You
+description: 좀비 스폰율 강화 + 기본템 + 베이스 기능 플러그인
+commands:
+  기본템:
+    description: 철 장비와 기본 아이템을 지급합니다.
+    usage: /기본템
