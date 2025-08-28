@@ -1,0 +1,6 @@
+name: ZombiePlugin
+version: 1.0
+main: com.yourname.zombie.ZombiePlugin
+api-version: 1.20
+author: YourName
+description: Custom zombie plugin that modifies spawn rate and health.
