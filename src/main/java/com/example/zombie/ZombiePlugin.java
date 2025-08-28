@@ -1,14 +1,14 @@
-package com.example.zombie;
+package com.zombie;
 
 import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
-import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.Sound;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.enchantments.Enchantment;
+import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Zombie;
 import org.bukkit.event.EventHandler;
@@ -18,166 +18,150 @@ import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.ShapedRecipe;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
-import org.bukkit.scheduler.BukkitRunnable;
 
 import java.util.*;
 
 public class ZombiePlugin extends JavaPlugin implements Listener {
 
-    private final Map<UUID, Location> baseLocations = new HashMap<>();
-    private final Map<UUID, Long> tpCooldown = new HashMap<>();
+    private final Map<UUID, Long> baseCooldown = new HashMap<>();
+    private final Map<UUID, org.bukkit.Location> baseLocations = new HashMap<>();
 
     @Override
     public void onEnable() {
-        getServer().getPluginManager().registerEvents(this, this);
-        getLogger().info("Zombie Plugin 활성화됨!");
+        Bukkit.getPluginManager().registerEvents(this, this);
+
+        // ========== 커스텀 레시피 등록 ==========
+        registerRecipes();
+
+        getLogger().info("ZombiePlugin 활성화됨!");
     }
 
     @Override
-    public void onDisable() {
-        getLogger().info("Zombie Plugin 비활성화됨!");
-    }
-
-    // /기본템 명령어
-    @Override
-    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (label.equalsIgnoreCase("기본템")) {
+    public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
+        if (cmd.getName().equalsIgnoreCase("기본템")) {
             if (sender instanceof Player) {
-                Player p = (Player) sender;
-                giveStarterKit(p);
+                Player player = (Player) sender;
+                giveStarterKit(player);
                 return true;
             }
         }
         return false;
     }
 
-    private void giveStarterKit(Player p) {
-        // 철갑옷 풀세트
-        ItemStack helmet = makeItem(Material.IRON_HELMET, "철 투구", Enchantment.PROTECTION_ENVIRONMENTAL, 2, Enchantment.DURABILITY, 10);
-        ItemStack chest = makeItem(Material.IRON_CHESTPLATE, "철 흉갑", Enchantment.PROTECTION_ENVIRONMENTAL, 2, Enchantment.DURABILITY, 10);
-        ItemStack legs = makeItem(Material.IRON_LEGGINGS, "철 각반", Enchantment.PROTECTION_ENVIRONMENTAL, 2, Enchantment.DURABILITY, 10);
-        ItemStack boots = makeItem(Material.IRON_BOOTS, "철 신발", Enchantment.PROTECTION_ENVIRONMENTAL, 2, Enchantment.DURABILITY, 10);
+    // 기본템 지급
+    private void giveStarterKit(Player player) {
+        // 철 갑옷
+        ItemStack helmet = enchItem(Material.IRON_HELMET, Map.of(Enchantment.PROTECTION_ENVIRONMENTAL, 2, Enchantment.DURABILITY, 10));
+        ItemStack chest = enchItem(Material.IRON_CHESTPLATE, Map.of(Enchantment.PROTECTION_ENVIRONMENTAL, 2, Enchantment.DURABILITY, 10));
+        ItemStack legs = enchItem(Material.IRON_LEGGINGS, Map.of(Enchantment.PROTECTION_ENVIRONMENTAL, 2, Enchantment.DURABILITY, 10));
+        ItemStack boots = enchItem(Material.IRON_BOOTS, Map.of(Enchantment.PROTECTION_ENVIRONMENTAL, 2, Enchantment.DURABILITY, 10));
 
-        p.getInventory().setHelmet(helmet);
-        p.getInventory().setChestplate(chest);
-        p.getInventory().setLeggings(legs);
-        p.getInventory().setBoots(boots);
+        player.getInventory().addItem(helmet, chest, legs, boots);
 
         // 무기 & 도구
-        p.getInventory().addItem(makeItem(Material.IRON_SWORD, "날카로운 철검", Enchantment.DAMAGE_ALL, 2, Enchantment.DURABILITY, 10));
-        p.getInventory().addItem(makeItem(Material.IRON_PICKAXE, "광부의 곡괭이", Enchantment.DIG_SPEED, 4, Enchantment.DURABILITY, 20));
-        p.getInventory().addItem(makeItem(Material.IRON_SHOVEL, "튼튼한 삽", Enchantment.DIG_SPEED, 3, Enchantment.DURABILITY, 50));
-        p.getInventory().addItem(makeItem(Material.IRON_HOE, "초고속 괭이", Enchantment.DIG_SPEED, 5));
-        p.getInventory().addItem(makeItem(Material.IRON_AXE, "나무꾼의 도끼", Enchantment.DIG_SPEED, 3));
+        player.getInventory().addItem(enchItem(Material.IRON_SWORD, Map.of(Enchantment.DAMAGE_ALL, 2, Enchantment.DURABILITY, 10)));
+        player.getInventory().addItem(enchItem(Material.IRON_PICKAXE, Map.of(Enchantment.DIG_SPEED, 4, Enchantment.DURABILITY, 20)));
+        player.getInventory().addItem(enchItem(Material.IRON_SHOVEL, Map.of(Enchantment.DIG_SPEED, 3, Enchantment.DURABILITY, 50)));
+        player.getInventory().addItem(enchItem(Material.IRON_HOE, Map.of(Enchantment.DIG_SPEED, 5)));
+        player.getInventory().addItem(enchItem(Material.IRON_AXE, Map.of(Enchantment.DIG_SPEED, 3)));
 
         // 활 & 화살
-        p.getInventory().addItem(makeItem(Material.BOW, "강력한 활", Enchantment.ARROW_INFINITE, 1, Enchantment.ARROW_DAMAGE, 4));
-        p.getInventory().addItem(new ItemStack(Material.SPECTRAL_ARROW, 64));
+        player.getInventory().addItem(enchItem(Material.BOW, Map.of(Enchantment.ARROW_INFINITE, 1, Enchantment.ARROW_DAMAGE, 4)));
+        player.getInventory().addItem(new ItemStack(Material.SPECTRAL_ARROW, 64));
 
         // 기타 아이템
-        p.getInventory().addItem(new ItemStack(Material.ENCHANTING_TABLE, 2));
-        p.getInventory().addItem(new ItemStack(Material.BOOKSHELF, 64));
-        p.getInventory().addItem(new ItemStack(Material.LAPIS_LAZULI, 64));
-        p.getInventory().addItem(new ItemStack(Material.COOKED_BEEF, 64));
+        player.getInventory().addItem(new ItemStack(Material.ENCHANTING_TABLE, 2));
+        player.getInventory().addItem(new ItemStack(Material.BOOKSHELF, 64));
+        player.getInventory().addItem(new ItemStack(Material.LAPIS_LAZULI, 64));
+        player.getInventory().addItem(new ItemStack(Material.COOKED_BEEF, 64));
 
         // 베이스 시계
-        p.getInventory().addItem(makeBaseClock());
+        ItemStack clock = new ItemStack(Material.CLOCK);
+        ItemMeta cm = clock.getItemMeta();
+        cm.setDisplayName("§6베이스 시계");
+        clock.setItemMeta(cm);
+        player.getInventory().addItem(clock);
 
-        // 체력, 레벨, 효과
-        p.getAttribute(Attribute.GENERIC_MAX_HEALTH).setBaseValue(100.0);
-        p.setHealth(100.0);
-        p.setLevel(100);
-        p.addPotionEffect(new PotionEffect(PotionEffectType.HEAL, 60, 99));
+        // HP, 레벨, 버프
+        player.getAttribute(Attribute.GENERIC_MAX_HEALTH).setBaseValue(100.0);
+        player.setHealth(100.0);
+        player.setLevel(100);
+        player.addPotionEffect(new PotionEffect(PotionEffectType.HEAL, 60, 100));
 
-        p.sendMessage(ChatColor.GREEN + "기본템이 지급되었습니다!");
+        player.sendMessage("§a기본템이 지급되었습니다!");
     }
 
-    private ItemStack makeItem(Material mat, String name, Object... enchants) {
-        ItemStack item = new ItemStack(mat, 1);
+    private ItemStack enchItem(Material mat, Map<Enchantment, Integer> enchants) {
+        ItemStack item = new ItemStack(mat);
         ItemMeta meta = item.getItemMeta();
-        meta.setDisplayName(ChatColor.YELLOW + name);
-        for (int i = 0; i < enchants.length; i += 2) {
-            Enchantment ench = (Enchantment) enchants[i];
-            int level = (int) enchants[i + 1];
-            meta.addEnchant(ench, level, true);
-        }
-        meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
+        enchants.forEach((enchant, lvl) -> meta.addEnchant(enchant, lvl, true));
         item.setItemMeta(meta);
         return item;
     }
 
-    private ItemStack makeBaseClock() {
-        ItemStack clock = new ItemStack(Material.CLOCK, 1);
-        ItemMeta meta = clock.getItemMeta();
-        meta.setDisplayName(ChatColor.AQUA + "베이스 시계");
-        clock.setItemMeta(meta);
-        return clock;
-    }
-
-    // 시계 클릭 → GUI 열기
+    // 베이스 시계
     @EventHandler
-    public void onClockUse(PlayerInteractEvent e) {
-        if (e.getItem() != null && e.getItem().getType() == Material.CLOCK &&
-                e.getItem().getItemMeta().getDisplayName().contains("베이스 시계")) {
-            Player p = e.getPlayer();
-            Inventory gui = Bukkit.createInventory(null, 9, "베이스 메뉴");
+    public void onUseClock(PlayerInteractEvent e) {
+        Player p = e.getPlayer();
+        ItemStack item = e.getItem();
+        if (item != null && item.getType() == Material.CLOCK && item.getItemMeta().hasDisplayName()
+                && item.getItemMeta().getDisplayName().equals("§6베이스 시계")) {
+            Inventory inv = Bukkit.createInventory(null, 9, "베이스 메뉴");
 
             ItemStack setBase = new ItemStack(Material.PAPER);
-            ItemMeta setMeta = setBase.getItemMeta();
-            setMeta.setDisplayName(ChatColor.GREEN + "베이스 설정");
-            setBase.setItemMeta(setMeta);
+            ItemMeta sm = setBase.getItemMeta();
+            sm.setDisplayName("§a베이스 설정");
+            setBase.setItemMeta(sm);
 
             ItemStack tpBase = new ItemStack(Material.PAPER);
-            ItemMeta tpMeta = tpBase.getItemMeta();
-            tpMeta.setDisplayName(ChatColor.AQUA + "베이스 순간이동");
-            tpBase.setItemMeta(tpMeta);
+            ItemMeta tm = tpBase.getItemMeta();
+            tm.setDisplayName("§b베이스 순간이동");
+            tpBase.setItemMeta(tm);
 
-            gui.setItem(3, setBase);
-            gui.setItem(5, tpBase);
+            inv.setItem(3, setBase);
+            inv.setItem(5, tpBase);
 
-            p.openInventory(gui);
+            p.openInventory(inv);
         }
     }
 
-    // GUI 클릭 이벤트
     @EventHandler
-    public void onInventoryClick(InventoryClickEvent e) {
+    public void onClickBaseMenu(InventoryClickEvent e) {
         if (e.getView().getTitle().equals("베이스 메뉴")) {
             e.setCancelled(true);
-            if (e.getCurrentItem() == null) return;
-
             Player p = (Player) e.getWhoClicked();
-            String name = e.getCurrentItem().getItemMeta().getDisplayName();
+            ItemStack clicked = e.getCurrentItem();
+            if (clicked == null || !clicked.hasItemMeta()) return;
 
-            if (name.contains("베이스 설정")) {
+            String name = clicked.getItemMeta().getDisplayName();
+            if (name.equals("§a베이스 설정")) {
                 baseLocations.put(p.getUniqueId(), p.getLocation());
-                p.playSound(p.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1f, 1f);
-                p.sendMessage(ChatColor.GREEN + "베이스가 설정되었습니다!");
-            } else if (name.contains("베이스 순간이동")) {
+                p.sendMessage("§a베이스가 설정되었습니다!");
+                p.closeInventory();
+            } else if (name.equals("§b베이스 순간이동")) {
                 if (!baseLocations.containsKey(p.getUniqueId())) {
-                    p.sendMessage(ChatColor.RED + "먼저 베이스를 설정하세요!");
+                    p.sendMessage("§c먼저 베이스를 설정하세요!");
                     return;
                 }
                 long now = System.currentTimeMillis();
-                if (tpCooldown.containsKey(p.getUniqueId()) && now - tpCooldown.get(p.getUniqueId()) < 5 * 60 * 1000) {
-                    p.sendMessage(ChatColor.RED + "아직 쿨타임입니다!");
+                if (baseCooldown.containsKey(p.getUniqueId()) && now - baseCooldown.get(p.getUniqueId()) < 300000) {
+                    p.sendMessage("§c쿨타임이 남아있습니다!");
                     return;
                 }
-                p.sendMessage(ChatColor.YELLOW + "5초 후 베이스로 순간이동합니다...");
-                new BukkitRunnable() {
-                    @Override
-                    public void run() {
-                        p.teleport(baseLocations.get(p.getUniqueId()));
-                        p.sendMessage(ChatColor.AQUA + "베이스로 이동했습니다!");
-                        tpCooldown.put(p.getUniqueId(), System.currentTimeMillis());
-                    }
-                }.runTaskLater(this, 20 * 5);
+                baseCooldown.put(p.getUniqueId(), now);
+                p.sendMessage("§e5초 후 베이스로 이동합니다...");
+                Bukkit.getScheduler().runTaskLater(this, () -> {
+                    p.teleport(baseLocations.get(p.getUniqueId()));
+                    p.playSound(p.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1, 1);
+                    p.sendMessage("§a베이스로 이동했습니다!");
+                }, 100);
+                p.closeInventory();
             }
         }
     }
@@ -185,17 +169,48 @@ public class ZombiePlugin extends JavaPlugin implements Listener {
     // 좀비 강화
     @EventHandler
     public void onZombieSpawn(CreatureSpawnEvent e) {
-        if (e.getEntity() instanceof Zombie z) {
+        if (e.getEntityType() == EntityType.ZOMBIE) {
+            Zombie z = (Zombie) e.getEntity();
             z.getAttribute(Attribute.GENERIC_MAX_HEALTH).setBaseValue(200.0);
             z.setHealth(200.0);
         }
     }
 
-    // 낙사 피해 무효
     @EventHandler
-    public void onFall(EntityDamageEvent e) {
-        if (e.getCause() == EntityDamageEvent.DamageCause.FALL) {
+    public void onFallDamage(EntityDamageEvent e) {
+        if (e.getEntityType() == EntityType.ZOMBIE && e.getCause() == EntityDamageEvent.DamageCause.FALL) {
             e.setCancelled(true);
         }
+    }
+
+    // 레시피 등록
+    private void registerRecipes() {
+        // OP 네더라이트 검
+        ItemStack opSword = new ItemStack(Material.NETHERITE_SWORD);
+        ItemMeta swordMeta = opSword.getItemMeta();
+        swordMeta.addEnchant(Enchantment.DAMAGE_ALL, 20, true);
+        swordMeta.addEnchant(Enchantment.FIRE_ASPECT, 10, true);
+        swordMeta.addEnchant(Enchantment.DAMAGE_UNDEAD, 20, true);
+        swordMeta.addEnchant(Enchantment.DAMAGE_ARTHROPODS, 20, true);
+        swordMeta.addEnchant(Enchantment.SWEEPING_EDGE, 20, true);
+        swordMeta.addEnchant(Enchantment.DURABILITY, 100, true);
+        swordMeta.addEnchant(Enchantment.MENDING, 1, true);
+        opSword.setItemMeta(swordMeta);
+
+        NamespacedKey swordKey = new NamespacedKey(this, "op_netherite_sword");
+        ShapedRecipe swordRecipe = new ShapedRecipe(swordKey, opSword);
+        swordRecipe.shape("N", "N", "S");
+        swordRecipe.setIngredient('N', Material.NETHERITE_INGOT);
+        swordRecipe.setIngredient('S', Material.STICK);
+        Bukkit.addRecipe(swordRecipe);
+
+        // 불사의 토템
+        ItemStack totem = new ItemStack(Material.TOTEM_OF_UNDYING);
+        NamespacedKey totemKey = new NamespacedKey(this, "custom_totem");
+        ShapedRecipe totemRecipe = new ShapedRecipe(totemKey, totem);
+        totemRecipe.shape("GEG");
+        totemRecipe.setIngredient('G', Material.GOLD_INGOT);
+        totemRecipe.setIngredient('E', Material.EMERALD);
+        Bukkit.addRecipe(totemRecipe);
     }
 }
